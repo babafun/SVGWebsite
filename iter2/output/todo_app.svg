@@ -1,0 +1,273 @@
+
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" id="svgApp">
+  <foreignObject width="100%" height="100%">
+    <html xmlns="http://www.w3.org/1999/xhtml">
+      <head>
+        <style><![CDATA[
+          * {
+    font-family: Roboto, "Helvetica Neue", Arial;
+
+}
+
+body {
+    margin: 0;
+    padding: 10px 20px;
+    background-color: #fafafa;
+}
+
+.title {
+    margin: 5px 0;
+    font-size: 20px;
+    font-weight: 700;
+    color: #111;
+}
+
+.subtitle {
+    margin: 5px 0;
+    margin-bottom: 20px;
+    font-size: 12px;
+    color: #666;
+}
+
+.listItemLabel {
+    font-size: 16px;
+    pointer-events: none;
+}
+
+.inputContainer {
+    padding: 5px 10px;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+    background-color: #f5f5f5;
+    display: flex;
+    flex-direction: row;
+    gap: 15px;
+}
+
+#listInput {
+    width: 100%;
+    height: 24px;
+    font-size: 14px;
+    padding: 2px 6px;
+    box-sizing: border-box;
+    margin: auto 0;
+}
+
+.inputBtn {
+    width: 96px;
+    height: 32px;
+    min-width: 96px;
+    min-height: 32px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    color: white;
+    font-size: 16px;
+}
+
+#addBtn {
+    background-color: #007bff
+}
+
+#exportBtn {
+    background-color: #6c757d
+}
+
+#todosList {
+    padding: 20px;
+    margin: 0;
+    height: 320px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.listItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #ffffff;
+    border: 1px solid #ddd;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0.3rem;
+}
+
+.listItemLabel {
+    flex: 1;
+    margin: 0 0.5rem;
+}
+
+.listItemArrows {
+    display: flex;
+}
+
+.listItemDelete {
+    color: red;
+}
+
+.listItem button {
+    height: 30px;
+    width: 30px;
+    cursor: pointer;
+    text-align: center;
+    background-color: transparent;
+    border: none;
+}
+
+.listItem input[type="checkbox"] {
+    width: 25px;
+    height: 25px;
+    border-radius: 10px;
+}
+        ]]></style>
+      </head>
+      <body>
+        <p class="title">Just a normal notes app</p>
+<p class="subtitle">Click a checkbox [✓] to toggle. Click ✖ to delete. Use ▲ and ▼ to reorder the list items.</p>
+
+<div class="inputContainer">
+    <input id="listInput" type="text" placeholder="Add new item (press Enter)" />
+    <button id="addBtn" class="inputBtn">Add</button>
+    <button id="exportBtn" class="inputBtn">Export</button>
+</div>
+
+<div id="todosList"></div>
+      </body>
+    </html>
+  </foreignObject>
+
+  <!-- Starter app data -->
+  <script type="application/json" id="dataStore">{}</script>
+
+  <script><![CDATA[
+    window.SVGApp = (function () {
+    const XHTML_NS = "http://www.w3.org/1999/xhtml";
+
+    const DATA_ID_ROOT = "dataStore";
+
+    const svgRef = document.getElementById('svgApp');
+
+    function _getSvgFileName() {
+        try {
+            const path = window.location.pathname;
+            const name = path.split('/').pop();
+            return name || 'export.svg';
+        } catch (e) {
+            return 'export.svg';
+        }
+    }
+
+    function _getStorageDataId() {
+        return `${DATA_ID_ROOT}_${_getSvgFileName()}`;
+    }
+
+    function _readFromSVG() {
+        const elem = document.getElementById(DATA_ID_ROOT);
+        if (!elem) return {};
+        try { return JSON.parse(elem.textContent); } catch { return {}; }
+    }
+
+    function _readFromLocalStorage() {
+        try { return JSON.parse(localStorage.getItem(_getStorageDataId())) || {}; }
+        catch { return {}; }
+    }
+
+    function loadData() {
+        const svgData = _readFromSVG();
+        const lsData = _readFromLocalStorage();
+        return { ...svgData, ...lsData };
+    }
+
+    function _writeToSVG(obj) {
+        let elem = document.getElementById(DATA_ID_ROOT);
+        if (!elem) {
+            elem = createSVGElement("script", "", DATA_ID_ROOT);
+            elem.setAttribute("type", "application/json");
+            document.documentElement.appendChild(elem);
+        }
+        console.log(obj)
+        elem.textContent = JSON.stringify(obj);
+    }
+
+    function _writeToLocalStorage(obj) {
+        localStorage.setItem(_getStorageDataId(), JSON.stringify(obj));
+    }
+
+    function saveData(obj) {
+        _writeToSVG(obj);
+        _writeToLocalStorage(obj);
+    }
+
+    async function exportSVG() {
+        const defaultName = _getSvgFileName();
+        const serializer = new XMLSerializer();
+        const source = serializer.serializeToString(svgRef);
+        const blob = new Blob([source], { type: 'image/svg+xml' });
+
+        if (window.showSaveFilePicker) {
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: defaultName,
+                    types: [
+                        {
+                            description: "SVG File",
+                            accept: { "image/svg+xml": [".svg"] },
+                        },
+                    ],
+                });
+
+                const writable = await handle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+
+                console.log("Saved with File System Access API");
+                return;
+            } catch (err) {
+                if (err.name === "AbortError") {
+                    console.log("User cancelled the save dialog.");
+                    return;
+                }
+                console.warn("File System API failed, falling back to download.", err);
+            }
+        }
+
+        const url = URL.createObjectURL(blob);
+
+        const a = createSVGElement("a");
+        a.href = url;
+        a.download = defaultName;
+        a.dispatchEvent(new MouseEvent("click"));
+
+        URL.revokeObjectURL(url);
+
+        console.log("Saved via fallback download");
+    }
+
+    function createSVGElement(tag, elemClass, elemId) {
+        const elem = document.createElementNS(XHTML_NS, tag);
+        if (elemClass) {
+            elem.setAttribute("class", elemClass);
+        }
+        if (elemId) {
+            elem.setAttribute("id", elemId);
+        }
+        return elem;
+    }
+
+    function init(width, height) {
+        svgRef.setAttribute("width", width);
+        svgRef.setAttribute("height", height);
+        svgRef.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    }
+
+    return { loadData, saveData, exportSVG, createSVGElement, init };
+})();
+
+    (()=>{SVGApp.init(720,480);var t=SVGApp.loadData().todos||[],m=document.getElementById("todosList"),u=document.getElementById("listInput"),S=document.getElementById("addBtn"),V=document.getElementById("exportBtn");function o(){SVGApp.saveData({todos:t})}function p(){m.innerHTML="",t.forEach((n,e)=>{let c=SVGApp.createSVGElement("div","listItem"),l=SVGApp.createSVGElement("input");l.setAttribute("type","checkbox"),n.done&&l.setAttribute("checked","true"),l.onclick=()=>{n.done=!n.done,o()};let s=SVGApp.createSVGElement("span","listItemLabel");s.textContent=n.text,n.done&&(s.style.textDecoration="line-through");let a=SVGApp.createSVGElement("div","listItemArrows"),i=SVGApp.createSVGElement("button");i.textContent="\u25B2",i.onclick=()=>{e>0&&([t[e-1],t[e]]=[t[e],t[e-1]],o(),p())};let d=SVGApp.createSVGElement("button");d.textContent="\u25BC",d.onclick=()=>{e<t.length-1&&([t[e+1],t[e]]=[t[e],t[e+1]],o(),p())};let r=SVGApp.createSVGElement("button","listItemDelete");r.textContent="\u2716",r.onclick=()=>{t=t.filter((h,G)=>G!==e),o(),p()},a.appendChild(i),a.appendChild(d),c.appendChild(l),c.appendChild(s),c.appendChild(a),c.appendChild(r),m.appendChild(c)})}S.onclick=()=>{let n=u.value.trim();n&&(t.push({text:n,done:!1,created:Date.now()}),u.value="",o(),p())};V.onclick=()=>{o(),SVGApp.exportSVG()};p();})();
+
+  ]]></script>
+</svg>

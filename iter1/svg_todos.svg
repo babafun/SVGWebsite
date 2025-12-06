@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     xmlns:xlink="http://www.w3.org/1999/xlink"
+     width="720" height="480"
+     viewBox="0 0 720 480"
+     id="svgApp">
+
+  <style>
+    text {
+        font-family: Roboto, "Helvetica Neue", Arial;
+    }
+
+    .title {
+        font-size: 20px;
+        font-weight: 700;
+        fill: #111;
+    }
+
+    .subtitle {
+        font-size: 12px;
+        fill: #666;
+    }
+
+    .listItemLabel {
+        font-size: 16px;
+        pointer-events: none;
+    }
+
+    .btn {
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .checkbox {
+        stroke: #444;
+        stroke-width: 2;
+        fill: white;
+    }
+
+    .del {
+        fill: #d33;
+        cursor: pointer;
+    }
+
+    .inputContainer {
+        fill: #f5f5f5;
+        stroke: #ddd;
+    }
+
+    #listInput {
+        width: 100%;
+        height: 24px;
+        font-size: 14px;
+        padding: 2px 6px;
+        box-sizing: border-box;
+    }
+  </style>
+
+  <rect width="100%" height="100%" fill="#fafafa" rx="8"/>
+
+  <g transform="translate(24,24)">
+    <text class="title">Just a normal todos app</text>
+    <text x="0" y="26" class="subtitle">Click a checkbox [✓] to toggle. Click ✖ to delete. Use ▲ and ▼ to reorder the list items.</text>
+  </g>
+
+  <g id="inputContainer" transform="translate(24,72)">
+    <rect class="inputContainer" x="0" y="0" width="675" height="40" rx="6"/>
+    <foreignObject x="8" y="6" width="440" height="28">
+      <body xmlns="http://www.w3.org/1999/xhtml" style="margin:0">
+        <input id="listInput" type="text" placeholder="Add new item (press Enter)" />
+      </body>
+    </foreignObject>
+    <g id="addBtn" transform="translate(460,4)" class="btn">
+      <rect x="0" y="0" width="96" height="32" rx="6" fill="#007bff"/>
+      <text x="48" y="20" text-anchor="middle" fill="#fff">Add</text>
+    </g>
+    <g id="exportBtn" transform="translate(570,4)" class="btn" opacity="0.9">
+      <rect x="0" y="0" width="96" height="32" rx="6" fill="#6c757d"/>
+      <text x="48" y="20" text-anchor="middle" fill="#fff">Export</text>
+    </g>
+  </g>
+
+  <g id="list" transform="translate(24,136)"></g>
+
+  <desc id="dataStore" style="display:none"></desc>
+
+  <script><![CDATA[
+  (function() {
+    const svg = document.getElementById('svgApp');
+    const listGroup = document.getElementById('list');
+    const input = document.getElementById('listInput');
+    const addBtn = document.getElementById('addBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const dataStore = document.getElementById('dataStore');
+
+    const DATA_ID_ROOT = 'dataStore';
+
+    if (!dataStore) {
+      desc = document.createElementNS(svg.namespaceURI, 'desc');
+      desc.id = 'dataStore';
+      svg.appendChild(desc);
+    }
+
+    const merged = readData();
+    writeData(merged);
+
+    function readData() {
+      let fileData = [];
+      try {
+        const desc = document.getElementById('dataStore');
+        if (desc && desc.textContent) {
+          const parsed = JSON.parse(desc.textContent);
+          if (Array.isArray(parsed)) {
+            fileData = parsed;
+          }
+        }
+      } catch (e) { }
+
+      let localData = [];
+      try {
+        const raw = localStorage.getItem(DATA_ID_ROOT);
+        if (raw) {
+          localData = JSON.parse(raw);
+        }
+      } catch (e) { console.warn('Failed to read localStorage', e); }
+
+      const merged = [...fileData];
+      localData.forEach(item => {
+        if (!merged.some(i => i.text === item.text && i.created === item.created)) {
+          merged.push(item);
+        }
+      });
+
+      return merged;
+    }
+
+    function writeData(items) {
+      try {
+        localStorage.setItem(DATA_ID_ROOT, JSON.stringify(items));
+      } catch (e) { }
+
+      try {
+        const desc = document.getElementById('dataStore');
+        if (desc) {
+          desc.textContent = JSON.stringify(items);
+        }
+      } catch (e) { }
+    }
+
+    function render() {
+      const items = readData();
+      while (listGroup.firstChild) listGroup.removeChild(listGroup.firstChild);
+
+      const rowH = 40;
+      items.forEach((it, i) => {
+        const y = i * (rowH + 8);
+        const g = document.createElementNS(svg.namespaceURI, 'g');
+        g.setAttribute('transform', `translate(0, ${y})`);
+        g.setAttribute('data-index', i);
+
+        const bg = document.createElementNS(svg.namespaceURI, 'rect');
+        bg.setAttribute('x', 0);
+        bg.setAttribute('y', 0);
+        bg.setAttribute('width', 676);
+        bg.setAttribute('height', rowH);
+        bg.setAttribute('rx', 6);
+        bg.setAttribute('fill', i % 2 === 0 ? '#fff' : '#fcfcfc');
+        bg.setAttribute('stroke', '#eee');
+        g.appendChild(bg);
+
+        const cb = document.createElementNS(svg.namespaceURI, 'rect');
+        cb.setAttribute('x', 8);
+        cb.setAttribute('y', 8);
+        cb.setAttribute('width', 24);
+        cb.setAttribute('height', 24);
+        cb.setAttribute('rx', 4);
+        cb.setAttribute('class', 'checkbox btn');
+        cb.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          toggleItem(i);
+        });
+        g.appendChild(cb);
+
+        if (it.done) {
+          const check = document.createElementNS(svg.namespaceURI, 'text');
+          check.setAttribute('x', 20);
+          check.setAttribute('y', 26);
+          check.setAttribute('text-anchor', 'middle');
+          check.textContent = '✓';
+          check.setAttribute('fill', '#2c7');
+          check.setAttribute('font-size', 16);
+          g.appendChild(check);
+        }
+
+        const t = document.createElementNS(svg.namespaceURI, 'text');
+        t.setAttribute('x', 44);
+        t.setAttribute('y', 25);
+        t.setAttribute('class', 'listItemLabel');
+        t.textContent = it.text;
+        if (it.done) t.setAttribute('fill', '#999');
+        g.appendChild(t);
+
+        const del = document.createElementNS(svg.namespaceURI, 'text');
+        del.setAttribute('x', 660);
+        del.setAttribute('y', 25);
+        del.setAttribute('class', 'del btn');
+        del.textContent = '✖';
+        del.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          deleteItem(i);
+        });
+        g.appendChild(del);
+
+        const arrowX = 620;
+        const arrowY = 24;
+
+        const up = document.createElementNS(svg.namespaceURI, 'text');
+        up.setAttribute('x', arrowX);
+        up.setAttribute('y', arrowY);
+        up.setAttribute('class', 'btn');
+        up.setAttribute('font-size', 16);
+        up.setAttribute('text-anchor', 'middle');
+        up.textContent = '▲';
+        up.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          moveItem(i, -1);
+        });
+        g.appendChild(up);
+
+        const down = document.createElementNS(svg.namespaceURI, 'text');
+        down.setAttribute('x', arrowX + 20);
+        down.setAttribute('y', arrowY);
+        down.setAttribute('class', 'btn');
+        down.setAttribute('font-size', 16);
+        down.setAttribute('text-anchor', 'middle');
+        down.textContent = '▼';
+        down.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          moveItem(i, 1);
+        });
+        g.appendChild(down);
+
+        listGroup.appendChild(g);
+      });
+    }
+
+    function addItem(text) {
+      if (!text || !text.trim()) {
+        return;
+      }
+
+      const items = readData();
+      items.unshift({ text: text.trim(), done: false, created: Date.now() });
+      writeData(items);
+      render();
+      input.value = '';
+    }
+
+    function toggleItem(index) {
+      const items = readData();
+      if (!items[index]) {
+        return;
+      }
+
+      items[index].done = !items[index].done;
+      writeData(items);
+      render();
+    }
+
+    function deleteItem(index) {
+      let items = readData();
+      items = items.filter((_, i) => i !== index);
+      writeData(items);
+      render();
+    }
+
+    function moveItem(index, delta) {
+      const items = readData();
+      const newIndex = index + delta;
+      if (newIndex < 0 || newIndex >= items.length) {
+        return;
+      }
+
+      [items[index], items[newIndex]] = [items[newIndex], items[index]];
+      writeData(items);
+      render();
+    }
+
+    function getSvgFileName() {
+      try {
+        const path = window.location.pathname;
+        const name = path.split('/').pop();
+        return name || 'export.svg';
+      } catch (e) {
+        return 'export.svg';
+      }
+    }
+
+    function exportSVG() {
+      const serializer = new XMLSerializer();
+      const source = serializer.serializeToString(svg);
+      const blob = new Blob([source], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+
+      const originalName = getSvgFileName();
+
+      const a = document.createElementNS("http://www.w3.org/1999/xhtml", "a");
+      a.href = url;
+      a.download = originalName;
+      a.dispatchEvent(new MouseEvent("click"));
+
+      URL.revokeObjectURL(url);
+    }
+
+    addBtn.addEventListener('click', () => addItem(input.value));
+    exportBtn.addEventListener('click', exportSVG);
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') {
+        addItem(input.value);
+      }
+    });
+
+    if (!localStorage.getItem(DATA_ID_ROOT)) {
+      writeData([]);
+    }
+    try {
+      const desc = document.getElementById('dataStore');
+      if (desc && desc.textContent) {
+        const parsed = JSON.parse(desc.textContent);
+        if (Array.isArray(parsed)) {
+          writeData(parsed);
+        }
+      }
+    } catch (e) { }
+
+    render();
+  })();
+  ]]></script>
+</svg>
