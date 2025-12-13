@@ -74,8 +74,7 @@ function render() {
     });
 }
 
-addBtn.onclick = () => {
-    const text = listInput.value.trim();
+function addItem(text) {
     if (!text) {
         return;
     }
@@ -89,6 +88,18 @@ addBtn.onclick = () => {
     listInput.value = "";
     save();
     render();
+}
+
+listInput.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') {
+        const text = listInput.value.trim();
+        addItem(text);
+    }
+});
+
+addBtn.onclick = () => {
+    const text = listInput.value.trim();
+    addItem(text)
 };
 
 exportBtn.onclick = () => {
